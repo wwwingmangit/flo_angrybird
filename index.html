@@ -4,17 +4,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Flo's Angry Birds</title>
+    <title>YETI SMASH!</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 
 <body>
-    <h1 id="game-title">Flo's Angry Birds</h1>
+    <h1 id="game-title">YETI SMASH!</h1>
     <div id="game-container">
         <canvas id="game-canvas"></canvas>
         <div id="ui">
-            <span id="bird-count">Oiseaux: 3</span>
-            <button id="restart-btn">Recommencer</button>
+            <span id="bird-count">Yétis: 3</span>
+            <div>
+                <button id="restart-btn" class="ui-btn">Rejouer</button>
+                <button id="mute-btn" class="ui-btn">🔊</button>
+            </div>
         </div>
         <div id="message" class="hidden"></div>
     </div>
@@ -25,6 +28,8 @@
     <script src="js/renderer.js"></script>
     <script src="js/slingshot.js"></script>
     <script src="js/level.js"></script>
+    <script src="js/particles.js"></script>
+    <script src="js/audio.js"></script>
     <script src="js/main.js"></script>
 </body>
 
