@@ -14,10 +14,15 @@ const Game = (function() {
     let settleTimer = 0;
     const SETTLE_TIME = 2000; // 2 secondes pour que tout se stabilise
 
+    // Effets visuels
+    let screenShake = { intensity: 0, duration: 0 };
+
     // Éléments UI
     let birdCountEl;
     let messageEl;
     let restartBtn;
+    let muteBtn;
+    let isMuted = false;
 
     function init() {
         // Initialiser le moteur physique
@@ -38,8 +43,10 @@ const Game = (function() {
         birdCountEl = document.getElementById('bird-count');
         messageEl = document.getElementById('message');
         restartBtn = document.getElementById('restart-btn');
+        muteBtn = document.getElementById('mute-btn');
 
         restartBtn.addEventListener('click', restart);
+        muteBtn.addEventListener('click', toggleMute);
 
         // Gestion des collisions
         Physics.onCollision(handleCollisions);
@@ -69,6 +76,10 @@ const Game = (function() {
         Level.useBird();
         Matter.Body.setStatic(bird, false);
         updateUI();
+
+        // Effets sonores et visuels
+        Audio.playLaunch();
+        Particles.create(bird.position.x, bird.position.y, 'snow', 5);
     }
 
     function handleCollisions(event) {
@@ -86,9 +97,30 @@ const Game = (function() {
 
             const impact = relativeVelocity * Math.min(bodyA.mass, bodyB.mass);
 
+            // Effet d'impact visuel et sonore
+            if (impact > 1.5) {
+                const contactX = (bodyA.position.x + bodyB.position.x) / 2;
+                const contactY = (bodyA.position.y + bodyB.position.y) / 2;
+
+                Audio.playImpact(impact);
+                Particles.createImpact(contactX, contactY, Math.min(12, Math.floor(impact * 2)));
+
+                // Screenshake pour impacts forts
+                if (impact > 3) {
+                    triggerScreenShake(impact * 0.5, 150);
+                }
+            }
+
             // Appliquer les dégâts
             applyDamage(bodyA, impact);
             applyDamage(bodyB, impact);
+        }
+    }
+
+    function triggerScreenShake(intensity, duration) {
+        if (intensity > screenShake.intensity) {
+            screenShake.intensity = Math.min(15, intensity);
+            screenShake.duration = duration;
         }
     }
 
@@ -100,11 +132,18 @@ const Game = (function() {
         if (body.gameType === 'pig') {
             body.health -= impact / 2;
             if (body.health <= 0) {
+                // Effets de destruction sanglier
+                Audio.playBoarDeath();
+                Particles.createExplosion(body.position.x, body.position.y, 'star', 12);
+                triggerScreenShake(5, 100);
                 Level.removePig(body);
             }
         } else if (body.gameType === 'block') {
             body.health -= impact / 1.5;
             if (body.health <= 0) {
+                // Effets de destruction bloc
+                Audio.playIceBreak();
+                Particles.createExplosion(body.position.x, body.position.y, 'ice', 10);
                 Level.removeBlock(body);
             }
         }
@@ -146,10 +185,12 @@ const Game = (function() {
             // Victoire !
             state = STATES.WIN;
             showMessage('Victoire !', 'win');
+            Audio.playWin();
         } else if (birdsRemaining === 0) {
             // Défaite
             state = STATES.LOSE;
             showMessage('Perdu...', 'lose');
+            Audio.playLose();
         } else {
             // Continuer avec le prochain oiseau
             prepareNextBird();
@@ -163,7 +204,7 @@ const Game = (function() {
 
     function updateUI() {
         const birdsRemaining = Level.getBirdsRemaining();
-        birdCountEl.textContent = `Oiseaux: ${birdsRemaining}`;
+        birdCountEl.textContent = `Yétis: ${birdsRemaining}`;
     }
 
     function restart() {
@@ -181,11 +222,27 @@ const Game = (function() {
 
         // Préparer le premier oiseau
         prepareNextBird();
+
+        // Clear particles
+        Particles.clear();
+    }
+
+    function toggleMute() {
+        isMuted = !isMuted;
+        Audio.setEnabled(!isMuted);
+        muteBtn.textContent = isMuted ? '🔇' : '🔊';
+        muteBtn.classList.toggle('muted', isMuted);
     }
 
     function gameLoop() {
         // Mettre à jour la physique
         Physics.update();
+
+        // Mettre à jour les particules
+        Particles.update();
+
+        // Mettre à jour le screenshake
+        updateScreenShake();
 
         // Vérifier l'état de l'oiseau
         checkBirdStatus();
@@ -198,9 +255,32 @@ const Game = (function() {
         requestAnimationFrame(gameLoop);
     }
 
+    function updateScreenShake() {
+        if (screenShake.duration > 0) {
+            screenShake.duration -= 16;
+            screenShake.intensity *= 0.9;
+        } else {
+            screenShake.intensity = 0;
+        }
+    }
+
     function render() {
+        const canvas = Renderer.getCanvas();
+        const ctx = canvas.getContext('2d');
+
+        // Appliquer le screenshake
+        if (screenShake.intensity > 0.5) {
+            const shakeX = (Math.random() - 0.5) * screenShake.intensity;
+            const shakeY = (Math.random() - 0.5) * screenShake.intensity;
+            ctx.save();
+            ctx.translate(shakeX, shakeY);
+        }
+
         // Dessiner tous les corps
         Renderer.render(Physics.getAllBodies());
+
+        // Dessiner les particules
+        Particles.render(ctx);
 
         // Dessiner le lance-pierre et l'élastique
         Slingshot.draw();
@@ -213,6 +293,11 @@ const Game = (function() {
                 20,
                 Renderer.COLORS.bird
             );
+        }
+
+        // Restaurer le contexte si screenshake
+        if (screenShake.intensity > 0.5) {
+            ctx.restore();
         }
     }
 
